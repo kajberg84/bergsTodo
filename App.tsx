@@ -24,7 +24,7 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [isListening, setIsListening] = useState(false);
   const [pendingAction, setPendingAction] = useState<VoiceAction>(null);
-  const [voiceMessage, setVoiceMessage] = useState('Tap the microphone and say “add this buy milk”.');
+  const [voiceMessage, setVoiceMessage] = useState('Tryck på mikrofonen och säg “lägga till köp mjölk”.');
   const hasLoaded = useRef(false);
 
   useEffect(() => {
@@ -79,19 +79,19 @@ export default function App() {
     if (pendingAction === 'remove') {
       setPendingAction(null); removeByVoice(spoken); return;
     }
-    const addText = afterPrefix(spoken, ['add this', 'add', 'lägg till']);
+    const addText = afterPrefix(spoken, ['lägga till']);
     if (addText !== undefined) {
       if (addText) { addTodo(addText); setVoiceMessage(`Added: ${addText}`); }
       else { setPendingAction('add'); setVoiceMessage('What should I add? Tap the microphone and say it.'); }
       return;
     }
-    const removeText = afterPrefix(spoken, ['remove this', 'remove', 'ta bort']);
+    const removeText = afterPrefix(spoken, ['ta bort']);
     if (removeText !== undefined) {
       if (removeText) removeByVoice(removeText);
       else { setPendingAction('remove'); setVoiceMessage('What should I remove? Tap the microphone and say it.'); }
       return;
     }
-    setVoiceMessage(`I heard “${spoken}”. Start with “add this” or “remove this”.`);
+    setVoiceMessage(`Jag hörde “${spoken}”. Börja med “lägga till” eller “ta bort”.`);
   }
 
   useSpeechRecognitionEvent('start', () => { setIsListening(true); setVoiceMessage('Listening…'); });
@@ -109,7 +109,7 @@ export default function App() {
     if (isListening) return ExpoSpeechRecognitionModule.stop();
     const permission = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
     if (!permission.granted) return setVoiceMessage('Microphone and speech permissions are required.');
-    ExpoSpeechRecognitionModule.start({ lang: 'en-US', interimResults: false, continuous: false });
+    ExpoSpeechRecognitionModule.start({ lang: 'sv-SE', interimResults: false, continuous: false });
   }
 
   return (
@@ -136,7 +136,7 @@ export default function App() {
         {isLoading ? <ActivityIndicator color="#173F35" style={styles.loader} /> : (
           <ScrollView contentContainerStyle={todos.length ? styles.list : styles.emptyList} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
             {todos.length === 0 ? (
-              <View style={styles.emptyState}><Text style={styles.emptyTitle}>Nothing here yet</Text><Text style={styles.emptyText}>Add a todo above or tap the microphone and say{`\n`}“add this buy milk”.</Text></View>
+              <View style={styles.emptyState}><Text style={styles.emptyTitle}>Inget här ännu</Text><Text style={styles.emptyText}>Lägg till något ovan eller tryck på mikrofonen och säg{`\n`}“lägga till köp mjölk”.</Text></View>
             ) : todos.map((todo) => (
               <View key={todo.id} style={styles.todoRow}>
                 <View style={styles.todoMarker} /><Text style={styles.todoText}>{todo.text}</Text>

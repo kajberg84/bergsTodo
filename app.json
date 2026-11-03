@@ -6,17 +6,34 @@
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSSpeechRecognitionUsageDescription": "Allow Bergs Todo to turn your spoken commands into text.",
+        "NSMicrophoneUsageDescription": "Allow Bergs Todo to hear your todo commands."
+      }
     },
     "android": {
       "package": "com.bergstodo.app",
       "adaptiveIcon": {
         "backgroundColor": "#173F35"
-      }
+      },
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
-    "plugins": [["expo-speech-recognition", {
-      "microphonePermission": "Allow Bergs Todo to hear your todo commands.",
-      "speechRecognitionPermission": "Allow Bergs Todo to turn your spoken commands into text."
-    }]]
+    "plugins": [
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Allow Bergs Todo to hear your todo commands.",
+          "speechRecognitionPermission": "Allow Bergs Todo to turn your spoken commands into text."
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "98eae8f6-1d1d-46e4-8e6b-a27b7a461a4d"
+      }
+    }
   }
 }
