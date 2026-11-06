@@ -5,8 +5,10 @@ An Android-first local todo app built with Expo, React Native, and strict TypeSc
 ## Features
 
 - Add and remove todos manually.
-- Say `lägga till köp mjölk` or `ta bort köp mjölk` after tapping the microphone.
-- Say only `lägga till` or `ta bort`, then tap again and speak the todo when prompted.
+- Say `lägg till köp mjölk` or `ta bort köp mjölk` after tapping the microphone.
+- Every todo has a visible number; say `ta bort nummer 2` to remove it.
+- Swedish number words from `en`/`ett` through `tjugo` are also recognized.
+- Say only `lägg till` or `ta bort`, then tap again and speak the todo when prompted.
 - Speech recognition uses the Swedish `sv-SE` locale.
 
 ## Android development build

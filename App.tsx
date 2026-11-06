@@ -8,6 +8,13 @@ type Todo = { id: string; text: string; createdAt: string };
 type VoiceAction = 'add' | 'remove' | null;
 const STORAGE_KEY = '@bergs-todo/items';
 
+const SWEDISH_NUMBERS: Record<string, number> = {
+  en: 1, ett: 1, två: 2, tre: 3, fyra: 4, fem: 5,
+  sex: 6, sju: 7, åtta: 8, nio: 9, tio: 10,
+  elva: 11, tolv: 12, tretton: 13, fjorton: 14, femton: 15,
+  sexton: 16, sjutton: 17, arton: 18, nitton: 19, tjugo: 20,
+};
+
 function normalize(value: string) {
   return value.toLocaleLowerCase().replace(/[^\p{L}\p{N}\s]/gu, '').replace(/\s+/g, ' ').trim();
 }
@@ -24,7 +31,7 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [isListening, setIsListening] = useState(false);
   const [pendingAction, setPendingAction] = useState<VoiceAction>(null);
-  const [voiceMessage, setVoiceMessage] = useState('Tryck på mikrofonen och säg “lägga till köp mjölk”.');
+  const [voiceMessage, setVoiceMessage] = useState('Tryck på mikrofonen och säg “lägg till köp mjölk”.');
   const hasLoaded = useRef(false);
 
   useEffect(() => {
@@ -33,7 +40,7 @@ export default function App() {
         const saved = await AsyncStorage.getItem(STORAGE_KEY);
         if (saved) setTodos(JSON.parse(saved) as Todo[]);
       } catch {
-        setVoiceMessage('Saved todos could not be loaded.');
+        setVoiceMessage('De sparade uppgifterna kunde inte läsas in.');
       } finally {
         hasLoaded.current = true;
         setIsLoading(false);
@@ -59,42 +66,55 @@ export default function App() {
 
   function removeByVoice(spokenText: string) {
     const target = normalize(spokenText);
+    const numberMatch = target.match(/^nummer\s+(.+)$/);
+    if (numberMatch) {
+      const spokenNumber = numberMatch[1];
+      const number = spokenNumber ? Number.parseInt(spokenNumber, 10) || SWEDISH_NUMBERS[spokenNumber] : undefined;
+      const numberedTodo = number ? todos[number - 1] : undefined;
+      if (!numberedTodo) {
+        setVoiceMessage(`Jag hittar ingen uppgift med nummer ${spokenNumber ?? ''}.`);
+        return;
+      }
+      removeTodo(numberedTodo.id);
+      setVoiceMessage(`Tog bort nummer ${number}: ${numberedTodo.text}`);
+      return;
+    }
     const exact = todos.filter((todo) => normalize(todo.text) === target);
     const partial = todos.filter((todo) => normalize(todo.text).includes(target));
     const match = exact.length === 1 ? exact[0] : partial.length === 1 ? partial[0] : undefined;
     if (!match) {
-      setVoiceMessage(partial.length > 1 ? `More than one todo matches “${spokenText}”. Remove it manually.` : `I could not find “${spokenText}”.`);
+      setVoiceMessage(partial.length > 1 ? `Flera uppgifter matchar ”${spokenText}”. Ta bort den manuellt.` : `Jag kunde inte hitta ”${spokenText}”.`);
       return;
     }
     removeTodo(match.id);
-    setVoiceMessage(`Removed: ${match.text}`);
+    setVoiceMessage(`Tog bort: ${match.text}`);
   }
 
   function handleTranscript(transcript: string) {
     const spoken = transcript.trim();
-    if (!spoken) return setVoiceMessage('I did not hear anything. Please try again.');
+    if (!spoken) return setVoiceMessage('Jag hörde ingenting. Försök igen.');
     if (pendingAction === 'add') {
-      addTodo(spoken); setPendingAction(null); setVoiceMessage(`Added: ${spoken}`); return;
+      addTodo(spoken); setPendingAction(null); setVoiceMessage(`Lade till: ${spoken}`); return;
     }
     if (pendingAction === 'remove') {
       setPendingAction(null); removeByVoice(spoken); return;
     }
-    const addText = afterPrefix(spoken, ['lägga till']);
+    const addText = afterPrefix(spoken, ['lägg till']);
     if (addText !== undefined) {
-      if (addText) { addTodo(addText); setVoiceMessage(`Added: ${addText}`); }
-      else { setPendingAction('add'); setVoiceMessage('What should I add? Tap the microphone and say it.'); }
+      if (addText) { addTodo(addText); setVoiceMessage(`Lade till: ${addText}`); }
+      else { setPendingAction('add'); setVoiceMessage('Vad ska jag lägga till? Tryck på mikrofonen och säg det.'); }
       return;
     }
     const removeText = afterPrefix(spoken, ['ta bort']);
     if (removeText !== undefined) {
       if (removeText) removeByVoice(removeText);
-      else { setPendingAction('remove'); setVoiceMessage('What should I remove? Tap the microphone and say it.'); }
+      else { setPendingAction('remove'); setVoiceMessage('Vad ska jag ta bort? Tryck på mikrofonen och säg det.'); }
       return;
     }
-    setVoiceMessage(`Jag hörde “${spoken}”. Börja med “lägga till” eller “ta bort”.`);
+    setVoiceMessage(`Jag hörde “${spoken}”. Börja med “lägg till” eller “ta bort”.`);
   }
 
-  useSpeechRecognitionEvent('start', () => { setIsListening(true); setVoiceMessage('Listening…'); });
+  useSpeechRecognitionEvent('start', () => { setIsListening(true); setVoiceMessage('Lyssnar…'); });
   useSpeechRecognitionEvent('end', () => setIsListening(false));
   useSpeechRecognitionEvent('result', (event) => {
     const transcript = event.results[0]?.transcript;
@@ -102,13 +122,13 @@ export default function App() {
   });
   useSpeechRecognitionEvent('error', (event) => {
     setIsListening(false);
-    setVoiceMessage(event.error === 'no-speech' ? 'I did not hear anything. Please try again.' : `Voice recognition failed: ${event.message || event.error}`);
+    setVoiceMessage(event.error === 'no-speech' ? 'Jag hörde ingenting. Försök igen.' : `Taligenkänningen misslyckades: ${event.message || event.error}`);
   });
 
   async function toggleListening() {
     if (isListening) return ExpoSpeechRecognitionModule.stop();
     const permission = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
-    if (!permission.granted) return setVoiceMessage('Microphone and speech permissions are required.');
+    if (!permission.granted) return setVoiceMessage('Appen behöver tillgång till mikrofon och taligenkänning.');
     ExpoSpeechRecognitionModule.start({ lang: 'sv-SE', interimResults: false, continuous: false });
   }
 
@@ -117,30 +137,30 @@ export default function App() {
       <StatusBar style="light" />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.screen}>
         <View style={styles.header}>
-          <View><Text style={styles.eyebrow}>BERGS TODO</Text><Text style={styles.title}>What needs doing?</Text></View>
+          <View><Text style={styles.eyebrow}>BERGS TODO</Text><Text style={styles.title}>Vad behöver göras?</Text></View>
           <View style={styles.countBadge}><Text style={styles.count}>{todos.length}</Text></View>
         </View>
 
         <View style={styles.voiceCard}>
-          <Pressable accessibilityLabel={isListening ? 'Stop listening' : 'Start listening'} accessibilityRole="button" onPress={() => void toggleListening()} style={({ pressed }) => [styles.micButton, isListening && styles.micButtonListening, pressed && styles.pressed]}>
+          <Pressable accessibilityLabel={isListening ? 'Sluta lyssna' : 'Börja lyssna'} accessibilityRole="button" onPress={() => void toggleListening()} style={({ pressed }) => [styles.micButton, isListening && styles.micButtonListening, pressed && styles.pressed]}>
             <Text style={styles.micIcon}>{isListening ? '■' : '●'}</Text>
           </Pressable>
-          <View style={styles.voiceCopy}><Text style={styles.voiceTitle}>{isListening ? 'Listening' : 'Voice command'}</Text><Text style={styles.voiceMessage}>{voiceMessage}</Text></View>
+          <View style={styles.voiceCopy}><Text style={styles.voiceTitle}>{isListening ? 'Lyssnar' : 'Röstkommando'}</Text><Text style={styles.voiceMessage}>{voiceMessage}</Text></View>
         </View>
 
         <View style={styles.composer}>
-          <TextInput onChangeText={setDraft} onSubmitEditing={() => addTodo(draft)} placeholder="Add a todo manually…" placeholderTextColor="#7C8D87" returnKeyType="done" style={styles.input} value={draft} />
-          <Pressable accessibilityLabel="Add todo" accessibilityRole="button" disabled={!draft.trim()} onPress={() => addTodo(draft)} style={({ pressed }) => [styles.addButton, !draft.trim() && styles.disabled, pressed && styles.pressed]}><Text style={styles.addButtonText}>＋</Text></Pressable>
+          <TextInput onChangeText={setDraft} onSubmitEditing={() => addTodo(draft)} placeholder="Lägg till en uppgift manuellt…" placeholderTextColor="#7C8D87" returnKeyType="done" style={styles.input} value={draft} />
+          <Pressable accessibilityLabel="Lägg till uppgift" accessibilityRole="button" disabled={!draft.trim()} onPress={() => addTodo(draft)} style={({ pressed }) => [styles.addButton, !draft.trim() && styles.disabled, pressed && styles.pressed]}><Text style={styles.addButtonText}>＋</Text></Pressable>
         </View>
 
         {isLoading ? <ActivityIndicator color="#173F35" style={styles.loader} /> : (
           <ScrollView contentContainerStyle={todos.length ? styles.list : styles.emptyList} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
             {todos.length === 0 ? (
-              <View style={styles.emptyState}><Text style={styles.emptyTitle}>Inget här ännu</Text><Text style={styles.emptyText}>Lägg till något ovan eller tryck på mikrofonen och säg{`\n`}“lägga till köp mjölk”.</Text></View>
-            ) : todos.map((todo) => (
+              <View style={styles.emptyState}><Text style={styles.emptyTitle}>Inget här ännu</Text><Text style={styles.emptyText}>Lägg till något ovan eller tryck på mikrofonen och säg{`\n`}“lägg till köp mjölk”.</Text></View>
+            ) : todos.map((todo, index) => (
               <View key={todo.id} style={styles.todoRow}>
-                <View style={styles.todoMarker} /><Text style={styles.todoText}>{todo.text}</Text>
-                <Pressable accessibilityLabel={`Remove ${todo.text}`} accessibilityRole="button" hitSlop={10} onPress={() => removeTodo(todo.id)} style={({ pressed }) => [styles.removeButton, pressed && styles.pressed]}><Text style={styles.removeText}>×</Text></Pressable>
+                <View style={styles.todoNumber}><Text style={styles.todoNumberText}>{index + 1}</Text></View><Text style={styles.todoText}>{todo.text}</Text>
+                <Pressable accessibilityLabel={`Ta bort ${todo.text}`} accessibilityRole="button" hitSlop={10} onPress={() => removeTodo(todo.id)} style={({ pressed }) => [styles.removeButton, pressed && styles.pressed]}><Text style={styles.removeText}>×</Text></Pressable>
               </View>
             ))}
           </ScrollView>
@@ -161,6 +181,6 @@ const styles = StyleSheet.create({
   composer: { flexDirection: 'row', marginHorizontal: 18, marginTop: 20 }, input: { backgroundColor: '#FFF', borderColor: '#DDE3DD', borderRadius: 16, borderWidth: 1, color: '#173F35', flex: 1, fontSize: 16, paddingHorizontal: 16 },
   addButton: { alignItems: 'center', backgroundColor: '#173F35', borderRadius: 16, height: 54, justifyContent: 'center', marginLeft: 10, width: 54 }, disabled: { opacity: 0.35 }, addButtonText: { color: '#FFF', fontSize: 28, lineHeight: 30 },
   loader: { marginTop: 60 }, list: { padding: 18, paddingBottom: 40 }, emptyList: { flexGrow: 1, justifyContent: 'center', padding: 30 }, emptyState: { alignItems: 'center', marginBottom: 80 }, emptyTitle: { color: '#173F35', fontSize: 20, fontWeight: '800' }, emptyText: { color: '#74817D', fontSize: 14, lineHeight: 22, marginTop: 8, textAlign: 'center' },
-  todoRow: { alignItems: 'center', backgroundColor: '#FFF', borderColor: '#E1E6E1', borderRadius: 16, borderWidth: 1, flexDirection: 'row', marginBottom: 10, minHeight: 64, padding: 14 }, todoMarker: { backgroundColor: '#D8F36A', borderRadius: 5, height: 10, marginRight: 12, width: 10 }, todoText: { color: '#263D36', flex: 1, fontSize: 16, fontWeight: '600', lineHeight: 22 },
+  todoRow: { alignItems: 'center', backgroundColor: '#FFF', borderColor: '#E1E6E1', borderRadius: 16, borderWidth: 1, flexDirection: 'row', marginBottom: 10, minHeight: 64, padding: 14 }, todoNumber: { alignItems: 'center', backgroundColor: '#D8F36A', borderRadius: 14, height: 28, justifyContent: 'center', marginRight: 12, minWidth: 28, paddingHorizontal: 6 }, todoNumberText: { color: '#173F35', fontSize: 13, fontWeight: '900' }, todoText: { color: '#263D36', flex: 1, fontSize: 16, fontWeight: '600', lineHeight: 22 },
   removeButton: { alignItems: 'center', height: 36, justifyContent: 'center', marginLeft: 8, width: 36 }, removeText: { color: '#8A9793', fontSize: 28, lineHeight: 30 }, pressed: { opacity: 0.65 },
 });
